@@ -44,11 +44,15 @@
       <div class="card-head">
         <div class="legend" id="legend" role="group" aria-label="Lease expiration risk — click to spotlight"></div>
         <div class="seg" role="tablist" aria-label="View">
-          <button id="viewStack" type="button" role="tab" aria-selected="true">Stack</button>
+          <button id="view3d" type="button" role="tab" aria-selected="true">3D</button>
+          <button id="viewStack" type="button" role="tab" aria-selected="false">Stack</button>
           <button id="viewTable" type="button" role="tab" aria-selected="false">Rent roll</button>
         </div>
       </div>
-      <div id="stackView" class="stack-wrap">
+      <div id="v3dView" class="stage3d">
+        <svg id="stageSvg" viewBox="0 0 1000 760" aria-hidden="true"></svg>
+      </div>
+      <div id="stackView" class="stack-wrap" hidden>
         <svg id="stackSvg" viewBox="0 0 1000 600"></svg>
       </div>
       <div id="tableView" hidden>
