@@ -399,6 +399,81 @@ body.dragging::after {
   pointer-events: none;
 }
 
+/* ---------- 3D hologram stage ---------- */
+/* The stage commits to one visual world — a dark ops screen — in both themes.
+   Bucket colors are pinned to the dark-surface-validated steps. */
+
+.stage3d {
+  --c-crit: #d03b3b;
+  --c-mid:  #c98500;
+  --c-far:  #3987e5;
+  --v3-vac:  #6b7787;
+  --v3-line: #3987e5;
+  --v3-ink:  #7fb3ff;
+  --v3-dim:  #46648b;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 85% at 50% 38%, #0a1424 0%, #060b16 52%, #030509 100%);
+  touch-action: none;
+}
+
+.stage3d svg { display: block; width: 100%; height: auto; cursor: grab; user-select: none; }
+.stage3d svg:active { cursor: grabbing; }
+
+.grid3 polyline {
+  fill: none;
+  stroke: var(--v3-line);
+  stroke-width: 1;
+}
+
+.s3 polygon {
+  stroke-linejoin: round;
+  stroke-width: 1.1;
+  transition: fill-opacity 0.45s ease, stroke-opacity 0.45s ease;
+}
+
+.s3.b-r0  polygon { fill: var(--c-crit); stroke: var(--c-crit); }
+.s3.b-r1  polygon { fill: var(--c-mid);  stroke: var(--c-mid); }
+.s3.b-r2  polygon { fill: var(--c-far);  stroke: var(--c-far); }
+.s3.b-vac polygon { fill: var(--v3-vac); stroke: var(--v3-vac); }
+
+.s3 .f-top { fill-opacity: 0.30; stroke-opacity: 0.9; }
+.s3 .f-z   { fill-opacity: 0.14; stroke-opacity: 0.55; }
+.s3 .f-x   { fill-opacity: 0.09; stroke-opacity: 0.45; }
+
+.s3.b-vac .f-top { fill-opacity: 0.05; stroke-opacity: 0.35; }
+.s3.b-vac .f-z   { fill-opacity: 0.02; stroke-opacity: 0.22; }
+.s3.b-vac .f-x   { fill-opacity: 0.02; stroke-opacity: 0.18; }
+
+.s3 { transition: opacity 0.2s ease; cursor: pointer; }
+.s3.dim { opacity: 0.13 !important; }
+.s3.hot .f-top { fill-opacity: 0.55; stroke-opacity: 1; }
+.s3.hot .f-z   { fill-opacity: 0.3;  stroke-opacity: 0.9; }
+.s3.hot .f-x   { fill-opacity: 0.22; stroke-opacity: 0.8; }
+
+.scan3 { fill: var(--v3-line); pointer-events: none; }
+
+.bloom3 { pointer-events: none; }
+
+.hud3 text {
+  fill: var(--v3-ink);
+  font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  user-select: none;
+  pointer-events: none;
+}
+
+.hud3 .dim3 { fill: var(--v3-dim); font-weight: 500; font-size: 10px; }
+
+.hud3 .br3 {
+  fill: none;
+  stroke: var(--v3-dim);
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+
 /* ---------- rent roll table ---------- */
 
 .table-wrap {
