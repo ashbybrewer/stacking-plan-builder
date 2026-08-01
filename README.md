@@ -9,10 +9,7 @@ double-click `index.html` or host it on GitHub Pages.
 
 **Live demo:** [ashbybrewer.github.io/stacking-plan-builder](https://ashbybrewer.github.io/stacking-plan-builder/)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.svg">
-  <img alt="Stacking plan of the sample building: floors stacked as a building cross-section, suites colored red (expiring within 12 months), amber (1–3 years), blue (3+ years), and hatched gray (vacant)." src="docs/preview.svg">
-</picture>
+<img alt="3D hologram view: the building as translucent glowing volumes on a radar grid, suites colored red (expiring within 12 months), amber (1–3 years), and blue (3+ years), with HUD readouts for occupancy and rollover." src="docs/preview-3d.svg">
 
 ## Why a stacking plan?
 
@@ -24,6 +21,10 @@ exposure, and vacancy all become visible in a glance.
 
 ## Features
 
+- **Hologram 3D view.** The building as translucent glowing volumes on a radar grid —
+  a hand-rolled orthographic projector in vanilla SVG + JS (no WebGL, no three.js).
+  Drag to orbit, scroll to zoom, double-click to reset. Floors assemble on load and a
+  scan sweep plays across the tower; vacant suites render hollow.
 - **CSV in, building out.** Drag a CSV onto the page (or click *Load CSV*). Column names
   are matched loosely — `rsf`, `area`, `expiration`, `lease_end` all work.
 - **Time scrubber.** Drag the *As of* slider (or press ▶) to move up to 10 years into the
@@ -40,7 +41,15 @@ exposure, and vacancy all become visible in a glance.
   accessibility fallback for everything the chart encodes).
 - **Building silhouette.** Floor width is proportional to floor RSF, so podiums and
   setbacks read like the actual massing.
-- **Export SVG** of the current view. Light & dark themes. Works on a phone.
+- **Export SVG** of the current view — including the 3D one. Light & dark themes.
+  Works on a phone.
+
+The classic 2D stacking plan is one tab away:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/preview-dark.svg">
+  <img alt="Classic 2D stacking plan of the sample building: floors stacked as a building cross-section, suites colored by expiration risk, hatched gray where vacant." src="docs/preview.svg">
+</picture>
 
 ## Quick start
 
@@ -98,7 +107,11 @@ A full example lives in [`data/sample-building.csv`](data/sample-building.csv).
 - Values shown in tooltips are never *only* in tooltips: suite labels render when they
   fit, and the rent-roll table carries everything.
 - Tenant names from CSVs are inserted with `textContent` only — no HTML injection.
-- Zero dependencies: ~14 KB CSS, ~36 KB JS, vanilla DOM + SVG. Works from `file://`.
+- The 3D stage deliberately commits to one dark "ops screen" world in both themes and
+  pins the same CVD-validated palette (dark-surface steps). It is a presentation
+  layer: the 2D stack and the rent-roll table remain the analytic and accessible
+  views, and `prefers-reduced-motion` disables the orbit, assemble, and scan motion.
+- Zero dependencies: ~16 KB CSS, ~50 KB JS, vanilla DOM + SVG. Works from `file://`.
 
 ## License
 
