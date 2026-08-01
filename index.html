@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stacking Plan Builder</title>
+  <meta name="description" content="Interactive commercial real estate stacking plans from a CSV — lease expiration risk, WALT, rollover schedule, and a time scrubber. No build, no dependencies.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='1' width='10' height='4' rx='1' fill='%23d03b3b'/%3E%3Crect x='2' y='6' width='12' height='4' rx='1' fill='%23eda100'/%3E%3Crect x='1' y='11' width='14' height='4' rx='1' fill='%232a78d6'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="3" y="1" width="10" height="4" rx="1" fill="var(--c-crit)"/>
+        <rect x="2" y="6" width="12" height="4" rx="1" fill="var(--c-mid)"/>
+        <rect x="1" y="11" width="14" height="4" rx="1" fill="var(--c-far)"/>
+      </svg>
+      <div>
+        <h1>Stacking Plan Builder</h1>
+        <p class="subtitle" id="buildingName">Loading…</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn icon" id="themeToggle" type="button" aria-label="Toggle theme">☾</button>
+      <button class="btn" id="exportBtn" type="button">Export SVG</button>
+      <button class="btn" id="loadSampleBtn" type="button">Sample</button>
+      <span class="btn primary file-btn">Load CSV<input type="file" id="csvInput" accept=".csv,text/csv" aria-label="Load a CSV file"></span>
+    </div>
+  </header>
+
+  <div class="timebar" role="group" aria-label="As-of date — scopes every number and color below">
+    <button class="playbtn" id="playBtn" type="button" aria-label="Play: scrub forward through time">▶</button>
+    <span class="asof">
+      <span class="asof-label">As of</span>
+      <output id="asofOut" for="timeSlider">Today</output>
+    </span>
+    <input type="range" id="timeSlider" min="0" max="120" step="1" value="0" aria-label="As-of date, months from today">
+    <button class="btn" id="resetBtn" type="button">Today</button>
+  </div>
+
+  <main class="layout">
+    <section class="card" aria-label="Stacking plan">
+      <div class="card-head">
+        <div class="legend" id="legend" role="group" aria-label="Lease expiration risk — click to spotlight"></div>
+        <div class="seg" role="tablist" aria-label="View">
+          <button id="viewStack" type="button" role="tab" aria-selected="true">Stack</button>
+          <button id="viewTable" type="button" role="tab" aria-selected="false">Rent roll</button>
+        </div>
+      </div>
+      <div id="stackView" class="stack-wrap">
+        <svg id="stackSvg" viewBox="0 0 1000 600"></svg>
+      </div>
+      <div id="tableView" hidden>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Floor</th><th>Suite</th><th>Tenant</th>
+                <th class="num">SF</th><th class="num">$/SF</th><th class="num">Annual</th>
+                <th>Start</th><th>Expires</th><th>Remaining</th>
+              </tr>
+            </thead>
+            <tbody id="rentRollBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="drop-hint">Drop a CSV anywhere on the page — columns: <code>floor, suite, tenant, sqft, lease_start, lease_end, rent_psf</code></p>
+    </section>
+
+    <aside class="side">
+      <div class="kpis" id="kpis" aria-label="Key metrics"></div>
+      <div class="card">
+        <h2>Lease rollover</h2>
+        <p class="sub">Occupied SF by expiration year, at the as-of date</p>
+        <div id="rolloverChart"></div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="tooltip" id="tooltip" hidden role="status"></div>
+  <div class="toast" id="toast" hidden role="status"></div>
+
+  <footer>
+    Stacking Plan Builder — open-source, zero-dependency, single-page. Drag the timeline to watch leases roll.
+  </footer>
+
+  <script src="sample-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
