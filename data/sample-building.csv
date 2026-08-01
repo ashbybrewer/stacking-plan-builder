@@ -1,0 +1,34 @@
+floor,suite,tenant,sqft,lease_start,lease_end,rent_psf,use
+PH,PH-1,Crestline Capital Partners,8900,2021-04-01,2035-03-31,68.00,Office
+17,1700,Meridian & Slate LLP,12600,2018-11-01,2033-10-31,63.00,Office
+16,1600,Meridian & Slate LLP,12600,2018-11-01,2033-10-31,62.00,Office
+15,1500,Meridian & Slate LLP,12600,2018-11-01,2033-10-31,61.00,Office
+14,1401,Summit Ridge Title & Escrow,6900,2021-04-01,2028-03-31,48.00,Office
+14,1402,,8500,,,,Office
+13,1301,Tidewater Wealth Management,8000,2017-05-01,2027-04-30,48.75,Office
+13,1302,Arbor Systems Consulting,7400,2020-01-01,2030-12-31,47.00,Office
+12,1201,Hollis & Grant LLP,8450,2019-06-01,2029-05-31,49.00,Office
+12,1202,Pinebrook Insurance Agency,6950,2021-09-01,2031-08-31,47.25,Office
+11,1101,Halloran Design Co.,7700,2016-12-01,2026-11-30,45.00,Office
+11,1102,,7700,,,,Office
+10,1001,Carroway Health Partners,9200,2017-02-01,2027-01-31,46.00,Office
+10,1002,Northgate Staffing Group,6200,2023-09-01,2028-08-31,44.50,Office
+9,900,Bluewater Software Group,15400,2022-07-01,2029-06-30,47.50,Office
+8,801,Westerly Freight Solutions,8900,2018-12-01,2028-11-30,43.25,Office
+8,802,,8900,,,,Office
+7,701,Beacon Point Engineering,10600,2020-07-01,2030-06-30,44.00,Office
+7,702,Corliss Talent Partners,7200,2019-05-01,,39.00,Office
+6,601,Ravel Marketing Group,9300,2022-08-01,2027-07-31,42.75,Office
+6,602,Granite Row Accounting,8500,2019-10-01,2029-09-30,43.00,Office
+5,500,Ketterman Mutual Insurance,17800,2022-06-01,2032-05-31,43.50,Office
+4,400,Cobalt River Bank,21500,2018-07-01,2033-06-30,40.00,Office
+3,300,Cobalt River Bank,21500,2018-07-01,2033-06-30,40.00,Office
+2,200,Vantage Point Coworking,21500,2024-02-01,2034-01-31,38.50,Coworking
+G,G-01,Cobalt River Bank,3800,2018-07-01,2033-06-30,72.00,Retail
+G,G-02,Fog Lantern Coffee,1900,2022-11-01,2027-10-31,85.00,Retail
+G,G-03,Verde Bowl Kitchen,2600,2023-06-01,2028-05-31,78.00,Retail
+G,G-04,Marina Cleaners,1400,2016-01-01,2026-12-31,64.00,Retail
+G,G-05,,2300,,,,Retail
+G,G-06,Harbor Pharmacy,2200,2020-10-01,2030-09-30,70.00,Retail
+LL,LL-01,Ironline Fitness,7300,2021-01-01,2031-12-31,28.00,Fitness
+LL,LL-02,Bay Storage Co.,2500,2024-03-01,2027-02-28,18.00,Storage
