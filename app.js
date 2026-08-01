@@ -40,7 +40,7 @@
     spotlight: null,  // bucket cls from legend, or null
     hoverTenant: null,
     pinnedSuite: null,
-    view: "stack",
+    view: "3d",
     issues: []
   };
 
@@ -481,6 +481,7 @@
       node.hit.setAttribute("aria-label", suiteAria(node, b, asOf));
     });
     applyEmphasis();
+    update3DRisk();
   }
 
   // ---------- emphasis (legend spotlight + same-tenant hover) ----------
@@ -496,6 +497,7 @@
       node.g.classList.toggle("dim", dim && !hot);
       node.g.classList.toggle("hot", hot);
     });
+    applyEmphasis3();
   }
 
   // ---------- tooltip ----------
@@ -808,8 +810,10 @@
     state.baseDate = todayUTC();
     state.spotlight = null;
     state.hoverTenant = null;
+    S3.built = false;
 
     renderBuilding();
+    if (state.view === "3d" && S3.svg) { build3D(); startStage3(); }
     setMonthIndex(0);
     renderTable();
 
@@ -855,11 +859,13 @@
   // ---------- export SVG ----------
 
   function exportSVGString() {
-    var svg = els.svg;
+    var svg = state.view === "3d" ? S3.svg : els.svg;
+    if (state.view === "3d" && S3.built) render3(performance.now()); // export the camera's current pose
     var clone = svg.cloneNode(true);
     var src = svg.querySelectorAll("*");
     var dst = clone.querySelectorAll("*");
-    var props = ["fill", "stroke", "stroke-width", "opacity", "font-size", "font-weight", "font-family"];
+    var props = ["fill", "stroke", "stroke-width", "opacity", "font-size", "font-weight", "font-family",
+      "fill-opacity", "stroke-opacity", "stroke-linejoin", "letter-spacing"];
     for (var i = 0; i < src.length; i++) {
       var cs = getComputedStyle(src[i]);
       for (var p = 0; p < props.length; p++) {
@@ -872,7 +878,7 @@
     }
     // hatch pattern line color resolves via computed style above; background:
     var bg = svgEl("rect", { x: 0, y: 0, width: "100%", height: "100%" });
-    bg.setAttribute("fill", getComputedStyle(document.body).backgroundColor);
+    bg.setAttribute("fill", state.view === "3d" ? "#05080f" : getComputedStyle(document.body).backgroundColor);
     clone.insertBefore(bg, clone.firstChild.nextSibling); // after <defs>
     clone.setAttribute("xmlns", SVG_NS);
     var vb = svg.getAttribute("viewBox").split(" ");
@@ -915,11 +921,354 @@
 
   function setView(v) {
     state.view = v;
+    els.v3dView.hidden = v !== "3d";
     els.stackView.hidden = v !== "stack";
     els.tableView.hidden = v !== "table";
+    els.view3d.setAttribute("aria-selected", v === "3d" ? "true" : "false");
     els.viewStack.setAttribute("aria-selected", v === "stack" ? "true" : "false");
     els.viewTable.setAttribute("aria-selected", v === "table" ? "true" : "false");
     if (v === "table") renderTable();
+    if (v === "3d") { S3.bornAt = performance.now(); startStage3(); }
+    else stopStage3();
+  }
+
+  // ---------- 3D hologram stage ----------
+  // Hand-rolled orthographic projector: the building as translucent glowing
+  // volumes in SVG. No libraries. Same data, same risk classes as the 2D view.
+
+  var prefersReduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var S3 = {
+    svg: null, world: null, gGrid: null, gTower: null, scanPoly: null,
+    hud: {}, theta: -0.72, phi: 0.47, zoom: 1, fit: 1, cy: 455,
+    nodes: [], grid: [], built: false,
+    raf: null, lastT: 0, bornAt: 0, lastInteract: -1e9,
+    drag: null, pointers: new Map(), pinchDist: 0
+  };
+  var VB3W = 1000, VB3H = 760, CX3 = 500;
+  var FH3 = 24, W3 = 360, D3 = 205, GRID_R = 300;
+
+  function view3(x, y, z) {
+    var ct = Math.cos(S3.theta), st = Math.sin(S3.theta);
+    var xr = x * ct + z * st, zr = -x * st + z * ct;
+    var cp = Math.cos(S3.phi), sp = Math.sin(S3.phi);
+    return { x: xr, y: y * cp - zr * sp, d: y * sp + zr * cp };
+  }
+
+  function pt3(v) {
+    var s = S3.fit * S3.zoom;
+    return (CX3 + v.x * s).toFixed(1) + "," + (S3.cy - v.y * s).toFixed(1);
+  }
+
+  // faces of a box given 8 corner indices (bottom 0-3, top 4-7)
+  var FACES3 = [
+    { i: [4, 5, 6, 7], k: "f-top" },
+    { i: [0, 1, 5, 4], k: "f-z" },
+    { i: [2, 3, 7, 6], k: "f-z" },
+    { i: [1, 2, 6, 5], k: "f-x" },
+    { i: [3, 0, 4, 7], k: "f-x" }
+  ];
+
+  function computeFit() {
+    var H = state.floors.length * FH3;
+    var rad = Math.sqrt(W3 * W3 + D3 * D3) / 2 + 14;
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    for (var a = 0; a < 12; a++) {
+      var th = a * Math.PI / 6, save = S3.theta;
+      S3.theta = th;
+      [[-rad, 0, -rad], [rad, 0, rad], [-rad, H, -rad], [rad, H, rad],
+       [rad, 0, -rad], [-rad, 0, rad], [rad, H, -rad], [-rad, H, rad]].forEach(function (c) {
+        var v = view3(c[0], c[1], c[2]);
+        minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+        minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+      });
+      S3.theta = save;
+    }
+    S3.fit = Math.min((VB3W - 150) / (maxX - minX), (VB3H - 150) / (maxY - minY));
+    S3.cy = VB3H / 2 + S3.fit * (maxY + minY) / 2;
+  }
+
+  function build3D() {
+    var svg = S3.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    S3.nodes = []; S3.grid = [];
+
+    var defs = svgEl("defs");
+    var f = svgEl("filter", { id: "bloom3", x: "-30%", y: "-30%", width: "160%", height: "160%" });
+    f.appendChild(svgEl("feGaussianBlur", { stdDeviation: 4 }));
+    defs.appendChild(f);
+    svg.appendChild(defs);
+
+    computeFit();
+
+    // soft bloom pass mirrors the world group underneath the crisp render
+    svg.appendChild(svgEl("use", { href: "#world3", "class": "bloom3", opacity: 0.75, filter: "url(#bloom3)" }));
+    var world = svgEl("g", { id: "world3" });
+    S3.world = world;
+
+    // ground grid + rings
+    var gGrid = svgEl("g", { "class": "grid3" });
+    var i, n;
+    for (i = -6; i <= 6; i++) {
+      var o = Math.max(0.05, 0.3 * (1 - Math.abs(i) / 7.5));
+      var l1 = svgEl("polyline", { "stroke-opacity": o.toFixed(2) });
+      l1._w = [[i * GRID_R / 6, 0, -GRID_R], [i * GRID_R / 6, 0, GRID_R]];
+      var l2 = svgEl("polyline", { "stroke-opacity": o.toFixed(2) });
+      l2._w = [[-GRID_R, 0, i * GRID_R / 6], [GRID_R, 0, i * GRID_R / 6]];
+      gGrid.appendChild(l1); gGrid.appendChild(l2);
+      S3.grid.push(l1, l2);
+    }
+    [0.55, 0.8, 1.04].forEach(function (rf, ri) {
+      var ring = svgEl("polyline", { "stroke-opacity": (0.35 - ri * 0.09).toFixed(2), "class": "ring3" });
+      var pts = [];
+      for (n = 0; n <= 56; n++) {
+        var an = n / 56 * Math.PI * 2;
+        pts.push([Math.cos(an) * GRID_R * rf, 0, Math.sin(an) * GRID_R * rf]);
+      }
+      ring._w = pts;
+      gGrid.appendChild(ring);
+      S3.grid.push(ring);
+    });
+    world.appendChild(gGrid);
+
+    // suite boxes
+    var gTower = svgEl("g");
+    S3.gTower = gTower;
+    var nF = state.floors.length;
+    var maxSF = Math.max.apply(null, state.floors.map(function (fl) { return fl.sf; }));
+    state.floors.forEach(function (fl, fi) {
+      var y0 = (nF - 1 - fi) * FH3, y1 = y0 + FH3 - 2;
+      var w = fl.sf / maxSF * W3;
+      var dp = D3 * (0.55 + 0.45 * fl.sf / maxSF);
+      var cx = -w / 2;
+      fl.suites.forEach(function (s) {
+        var sw = s.sqft / fl.sf * w;
+        var x0 = cx + 0.8, x1 = cx + Math.max(sw - 0.8, 1.6);
+        var corners = [
+          [x0, y0, -dp / 2], [x1, y0, -dp / 2], [x1, y0, dp / 2], [x0, y0, dp / 2],
+          [x0, y1, -dp / 2], [x1, y1, -dp / 2], [x1, y1, dp / 2], [x0, y1, dp / 2]
+        ];
+        var g = svgEl("g", { "class": "s3" });
+        var faces = FACES3.map(function (fd) {
+          var p = svgEl("polygon", { "class": fd.k });
+          g.appendChild(p);
+          return { el: p, i: fd.i };
+        });
+        gTower.appendChild(g);
+        var node = { s: s, g: g, faces: faces, corners: corners, floorIdx: fi, d: 0, hit: g, bucket: "r2" };
+        S3.nodes.push(node);
+
+        g.addEventListener("pointerenter", function (e) { if (!S3.drag) onSuiteHover(node, e); });
+        g.addEventListener("pointermove", function (e) { if (!S3.drag) moveTooltip(e); });
+        g.addEventListener("pointerleave", function () { onSuiteLeave(node); });
+        g.addEventListener("click", function (e) {
+          if (S3.dragMoved) return;
+          e.stopPropagation();
+          onSuitePin(node, e);
+        });
+        cx += sw;
+      });
+    });
+    world.appendChild(gTower);
+
+    // scan sweep
+    S3.scanPoly = svgEl("polygon", { "class": "scan3", opacity: 0 });
+    world.appendChild(S3.scanPoly);
+    svg.appendChild(world);
+
+    // HUD: corner brackets + readouts (screen space, static)
+    var hud = svgEl("g", { "class": "hud3" });
+    [[16, 16, 1, 1], [VB3W - 16, 16, -1, 1], [16, VB3H - 16, 1, -1], [VB3W - 16, VB3H - 16, -1, -1]].forEach(function (b) {
+      hud.appendChild(svgEl("path", {
+        d: "M " + (b[0] + 22 * b[2]) + " " + b[1] + " L " + b[0] + " " + b[1] + " L " + b[0] + " " + (b[1] + 22 * b[3]),
+        "class": "br3"
+      }));
+    });
+    function hudText(x, y, cls, anchor) {
+      var t = svgEl("text", { x: x, y: y, "class": cls });
+      if (anchor) t.setAttribute("text-anchor", anchor);
+      hud.appendChild(t);
+      return t;
+    }
+    S3.hud.name = hudText(34, 44, "");
+    S3.hud.asof = hudText(34, 62, "dim3");
+    S3.hud.occ = hudText(VB3W - 34, 44, "", "end");
+    S3.hud.exp = hudText(VB3W - 34, 62, "dim3", "end");
+    S3.hud.hint = hudText(34, VB3H - 28, "dim3");
+    S3.hud.hint.textContent = "DRAG TO ORBIT · SCROLL TO ZOOM · DOUBLE-CLICK TO RESET";
+    svg.appendChild(hud);
+
+    S3.bornAt = performance.now();
+    S3.built = true;
+    update3DRisk();
+    update3DHud();
+  }
+
+  function update3DRisk() {
+    if (!S3.built) return;
+    var asOf = state.asOf;
+    S3.nodes.forEach(function (node) {
+      var b = bucketOf(node.s, asOf);
+      node.bucket = b;
+      node.g.setAttribute("class", "s3 " + BUCKETS[b].cls);
+    });
+    applyEmphasis3();
+    update3DHud();
+  }
+
+  function applyEmphasis3() {
+    if (!S3.built) return;
+    S3.nodes.forEach(function (node) {
+      var dim = false, hot = false;
+      if (state.spotlight) dim = BUCKETS[node.bucket].cls !== state.spotlight;
+      if (state.hoverTenant) {
+        if (node.s.tenant === state.hoverTenant && node.bucket !== "vac") hot = true;
+        else dim = true;
+      }
+      node.g.classList.toggle("dim", dim && !hot);
+      node.g.classList.toggle("hot", hot);
+    });
+  }
+
+  function update3DHud() {
+    if (!S3.built || !state.stats) return;
+    S3.hud.name.textContent = state.name.toUpperCase();
+    S3.hud.asof.textContent = "AS OF " + (state.monthIndex === 0 ? "TODAY" : fmtMonthYear(state.asOf).toUpperCase());
+    S3.hud.occ.textContent = "OCCUPANCY " + (state.stats.occPct * 100).toFixed(1) + "%";
+    S3.hud.exp.textContent = "EXPIRING ≤ 12 MO · " + fmtCompact(state.stats.exp12) + " SF";
+  }
+
+  function easeOut(e) { return 1 - Math.pow(1 - e, 3); }
+
+  function render3(t) {
+    var nF = state.floors.length;
+    var H = nF * FH3;
+
+    S3.grid.forEach(function (ln) {
+      ln.setAttribute("points", ln._w.map(function (c) { return pt3(view3(c[0], c[1], c[2])); }).join(" "));
+    });
+
+    var born = t - S3.bornAt;
+    S3.nodes.forEach(function (node) {
+      var e = 1;
+      if (!prefersReduced) {
+        var delay = (nF - 1 - node.floorIdx) * 55;
+        e = Math.max(0, Math.min(1, (born - delay) / 520));
+      }
+      var ez = easeOut(e);
+      var yOff = (1 - ez) * -30;
+      node.g.setAttribute("opacity", (0.15 + 0.85 * ez).toFixed(2));
+      var proj = node.corners.map(function (c) { return view3(c[0], c[1] + yOff, c[2]); });
+      var dSum = 0;
+      node.faces.forEach(function (fc) {
+        var fd = 0;
+        fc.el.setAttribute("points", fc.i.map(function (ci) { fd += proj[ci].d; return pt3(proj[ci]); }).join(" "));
+        fc.d = fd / 4;
+        dSum += fc.d;
+      });
+      node.d = dSum / node.faces.length;
+      node.faces.slice().sort(function (a, b) { return a.d - b.d; }).forEach(function (fc) { node.g.appendChild(fc.el); });
+    });
+    S3.nodes.slice().sort(function (a, b) { return a.d - b.d; }).forEach(function (node) { S3.gTower.appendChild(node.g); });
+
+    // scan sweep
+    if (!prefersReduced) {
+      var p = (born % 8500) / 8500;
+      if (p < 0.4 && born > 1400) {
+        var ys = p / 0.4 * H;
+        var m = Math.sin(Math.PI * p / 0.4);
+        var ext = W3 / 2 + 16, dz = D3 / 2 + 16;
+        S3.scanPoly.setAttribute("points",
+          [[-ext, ys, -dz], [ext, ys, -dz], [ext, ys, dz], [-ext, ys, dz]].map(function (c) {
+            return pt3(view3(c[0], c[1], c[2]));
+          }).join(" "));
+        S3.scanPoly.setAttribute("opacity", (0.16 * m).toFixed(3));
+      } else {
+        S3.scanPoly.setAttribute("opacity", 0);
+      }
+    }
+  }
+
+  function frame3(t) {
+    if (state.view !== "3d") { S3.raf = null; return; }
+    var dt = Math.min(0.06, (t - S3.lastT) / 1000 || 0.016);
+    S3.lastT = t;
+    var idle = t - S3.lastInteract > 4000;
+    if (!prefersReduced && !S3.drag && idle) S3.theta += dt * 0.14;
+    render3(t);
+    if (prefersReduced && !S3.drag && t - S3.lastInteract > 900 && t - S3.bornAt > 1200) {
+      S3.raf = null; // static scene fully drawn — idle until next interaction
+      return;
+    }
+    S3.raf = requestAnimationFrame(frame3);
+  }
+
+  function startStage3() {
+    if (!S3.built) build3D();
+    if (!S3.raf && state.view === "3d") {
+      S3.lastT = performance.now();
+      S3.raf = requestAnimationFrame(frame3);
+    }
+  }
+
+  function stopStage3() {
+    if (S3.raf) { cancelAnimationFrame(S3.raf); S3.raf = null; }
+  }
+
+  function poke3() {
+    S3.lastInteract = performance.now();
+    startStage3();
+  }
+
+  function initStage3Events() {
+    var svg = S3.svg;
+    svg.addEventListener("pointerdown", function (e) {
+      svg.setPointerCapture(e.pointerId);
+      S3.pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (S3.pointers.size === 2) {
+        var ps = Array.from(S3.pointers.values());
+        S3.pinchDist = Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]);
+      }
+      S3.drag = [e.clientX, e.clientY];
+      S3.dragMoved = false;
+      poke3();
+    });
+    svg.addEventListener("pointermove", function (e) {
+      if (!S3.pointers.has(e.pointerId)) return;
+      S3.pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (S3.pointers.size === 2) {
+        var ps = Array.from(S3.pointers.values());
+        var d = Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]);
+        if (S3.pinchDist > 0) S3.zoom = Math.max(0.55, Math.min(1.9, S3.zoom * d / S3.pinchDist));
+        S3.pinchDist = d;
+        poke3();
+        return;
+      }
+      if (!S3.drag) return;
+      var dx = e.clientX - S3.drag[0], dy = e.clientY - S3.drag[1];
+      if (Math.abs(dx) + Math.abs(dy) > 3) S3.dragMoved = true;
+      S3.theta += dx * 0.0055;
+      S3.phi = Math.max(0.16, Math.min(1.15, S3.phi + dy * 0.004));
+      S3.drag = [e.clientX, e.clientY];
+      poke3();
+    });
+    function up(e) {
+      S3.pointers.delete(e.pointerId);
+      if (S3.pointers.size < 2) S3.pinchDist = 0;
+      if (S3.pointers.size === 0) S3.drag = null;
+      poke3();
+    }
+    svg.addEventListener("pointerup", up);
+    svg.addEventListener("pointercancel", up);
+    svg.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      S3.zoom = Math.max(0.55, Math.min(1.9, S3.zoom * Math.exp(-e.deltaY * 0.0012)));
+      poke3();
+    }, { passive: false });
+    svg.addEventListener("dblclick", function () {
+      S3.theta = -0.72; S3.phi = 0.47; S3.zoom = 1;
+      poke3();
+    });
   }
 
   // ---------- init ----------
@@ -938,9 +1287,13 @@
     els.tbody = $("rentRollBody");
     els.stackView = $("stackView");
     els.tableView = $("tableView");
+    els.v3dView = $("v3dView");
+    els.view3d = $("view3d");
     els.viewStack = $("viewStack");
     els.viewTable = $("viewTable");
     els.themeBtn = $("themeToggle");
+    S3.svg = $("stageSvg");
+    initStage3Events();
 
     var stored = null;
     try { stored = localStorage.getItem("spb-theme"); } catch (e) { /* ignore */ }
@@ -961,6 +1314,7 @@
       e.target.value = "";
     });
     $("exportBtn").addEventListener("click", downloadSVG);
+    els.view3d.addEventListener("click", function () { setView("3d"); });
     els.viewStack.addEventListener("click", function () { setView("stack"); });
     els.viewTable.addEventListener("click", function () { setView("table"); });
 
@@ -989,7 +1343,7 @@
     });
 
     // expose for the export pipeline / tinkering
-    window.StackingPlan = { loadData: loadData, exportSVGString: exportSVGString, state: state };
+    window.StackingPlan = { loadData: loadData, exportSVGString: exportSVGString, state: state, S3: S3 };
 
     loadData(SAMPLE_CSV, SAMPLE_NAME);
   }
